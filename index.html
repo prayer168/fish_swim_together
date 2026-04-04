@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>動態群游模擬</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            overflow: hidden;
+            background: #0a0f1e;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        .controls {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px 20px;
+            border-radius: 10px;
+            color: white;
+            backdrop-filter: blur(10px);
+        }
+        .controls div {
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        .controls button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .controls button.pause {
+            background: #e74c3c;
+        }
+        .controls button.start {
+            background: #27ae60;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div class="controls">
+        <div>🖱️ 移動滑鼠控制大魚</div>
+        <button id="toggleBtn" class="pause">暫停</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const toggleBtn = document.getElementById('toggleBtn');
+        
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let isRunning = true;
+        const boidCount = 500;
+
+        class BigFish {
+            constructor() {
+                this.x = canvas.width / 2;
+                this.y = canvas.height / 2;
+                this.vx = 0;
+                this.vy = 0;
+                this.size = 60;
+                this.hue = 200;
+                this.targetX = this.x;
+                this.targetY = this.y;
+            }
+
+            setTarget(x, y) {
+                this.targetX = x;
+                this.targetY = y;
+            }
+
+            update() {
+                const dx = this.targetX - this.x;
+                const dy = this.targetY - this.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist > 5) {
+                    this.vx += (dx / dist) * 0.15;
+                    this.vy += (dy / dist) * 0.15;
+                }
+
+                const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                const maxSpeed = 4;
+                if (speed > maxSpeed) {
+                    this.vx = (this.vx / speed) * maxSpeed;
+                    this.vy = (this.vy / speed) * maxSpeed;
+                }
+
+                this.vx *= 0.98;
+                this.vy *= 0.98;
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                const margin = 100;
+                if (this.x < margin) {
+                    this.x = margin;
+                    this.vx *= -0.5;
+                }
+                if (this.x > canvas.width - margin) {
+                    this.x = canvas.width - margin;
+                    this.vx *= -0.5;
+                }
+                if (this.y < margin) {
+                    this.y = margin;
+                    this.vy *= -0.5;
+                }
+                if (this.y > canvas.height - margin) {
+                    this.y = canvas.height - margin;
+                    this.vy *= -0.5;
+                }
+
+                this.hue = (this.hue + 0.3) % 360;
+            }
+
+            draw(ctx) {
+                const angle = Math.atan2(this.vy, this.vx);
+                
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(angle);
+
+                ctx.strokeStyle = `hsla(${this.hue}, 100%, 70%, 0.5)`;
+                ctx.lineWidth = 5;
+                ctx.beginPath();
+                ctx.ellipse(0, 0, this.size * 1.5, this.size * 1, 0, 0, Math.PI * 2);
+                ctx.stroke();
+
+                const bodyGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.size);
+                bodyGradient.addColorStop(0, `hsla(${this.hue}, 90%, 70%, 1)`);
+                bodyGradient.addColorStop(0.5, `hsla(${this.hue + 30}, 80%, 60%, 0.9)`);
+                bodyGradient.addColorStop(1, `hsla(${this.hue + 60}, 70%, 50%, 0.6)`);
+                
+                ctx.fillStyle = bodyGradient;
+                ctx.beginPath();
+                ctx.ellipse(0, 0, this.size, this.size * 0.6, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = `hsla(${this.hue + 40}, 80%, 65%, 0.8)`;
+                ctx.beginPath();
+                ctx.moveTo(-this.size, 0);
+                ctx.lineTo(-this.size * 1.6, -this.size * 0.6);
+                ctx.lineTo(-this.size * 1.6, this.size * 0.6);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+                ctx.beginPath();
+                ctx.arc(this.size * 0.4, -this.size * 0.25, this.size * 0.2, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+                ctx.beginPath();
+                ctx.arc(this.size * 0.45, -this.size * 0.25, this.size * 0.1, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            }
+        }
+
+        class Boid {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.vx = (Math.random() - 0.5) * 4;
+                this.vy = (Math.random() - 0.5) * 4;
+                this.hue = Math.random() * 360;
+                this.hueSpeed = (Math.random() - 0.5) * 2;
+                this.size = Math.random() * 3 + 2;
+                this.trail = [];
+                this.maxTrail = 15;
+            }
+
+            update(boids, bigFish) {
+                let separationX = 0, separationY = 0;
+                let alignmentX = 0, alignmentY = 0;
+                let cohesionX = 0, cohesionY = 0;
+                let nearbyCount = 0;
+
+                const perceptionRadius = 80;
+                const separationRadius = 30;
+
+                const bigFishDx = bigFish.x - this.x;
+                const bigFishDy = bigFish.y - this.y;
+                const bigFishDist = Math.sqrt(bigFishDx * bigFishDx + bigFishDy * bigFishDy);
+                const avoidRadius = bigFish.size + 150;
+
+                if (bigFishDist < avoidRadius) {
+                    const avoidForce = (avoidRadius - bigFishDist) / avoidRadius;
+                    separationX -= (bigFishDx / bigFishDist) * avoidForce * 8;
+                    separationY -= (bigFishDy / bigFishDist) * avoidForce * 8;
+                }
+
+                for (let other of boids) {
+                    if (other === this) continue;
+                    
+                    const dx = other.x - this.x;
+                    const dy = other.y - this.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < perceptionRadius && dist > 0) {
+                        if (dist < separationRadius) {
+                            separationX -= dx / dist;
+                            separationY -= dy / dist;
+                        }
+                        
+                        alignmentX += other.vx;
+                        alignmentY += other.vy;
+                        
+                        cohesionX += other.x;
+                        cohesionY += other.y;
+                        
+                        nearbyCount++;
+                    }
+                }
+
+                if (nearbyCount > 0) {
+                    alignmentX /= nearbyCount;
+                    alignmentY /= nearbyCount;
+                    cohesionX /= nearbyCount;
+                    cohesionY /= nearbyCount;
+                    
+                    cohesionX -= this.x;
+                    cohesionY -= this.y;
+                }
+
+                this.vx += separationX * 0.05 + alignmentX * 0.05 + cohesionX * 0.005;
+                this.vy += separationY * 0.05 + alignmentY * 0.05 + cohesionY * 0.005;
+
+                this.vx += (Math.random() - 0.5) * 0.5;
+                this.vy += (Math.random() - 0.5) * 0.5;
+
+                const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                const maxSpeed = 4;
+                if (speed > maxSpeed) {
+                    this.vx = (this.vx / speed) * maxSpeed;
+                    this.vy = (this.vy / speed) * maxSpeed;
+                }
+
+                this.trail.push({ x: this.x, y: this.y, hue: this.hue });
+                if (this.trail.length > this.maxTrail) {
+                    this.trail.shift();
+                }
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                const margin = 50;
+                if (this.x < margin) {
+                    this.vx += (margin - this.x) * 0.1;
+                }
+                if (this.x > canvas.width - margin) {
+                    this.vx -= (this.x - (canvas.width - margin)) * 0.1;
+                }
+                if (this.y < margin) {
+                    this.vy += (margin - this.y) * 0.1;
+                }
+                if (this.y > canvas.height - margin) {
+                    this.vy -= (this.y - (canvas.height - margin)) * 0.1;
+                }
+
+                this.hue += this.hueSpeed;
+                if (this.hue > 360) this.hue = 0;
+                if (this.hue < 0) this.hue = 360;
+            }
+
+            draw(ctx) {
+                for (let i = 0; i < this.trail.length - 1; i++) {
+                    const alpha = i / this.trail.length;
+                    const point = this.trail[i];
+                    ctx.strokeStyle = `hsla(${point.hue}, 80%, 60%, ${alpha * 0.3})`;
+                    ctx.lineWidth = this.size * alpha;
+                    ctx.beginPath();
+                    ctx.moveTo(point.x, point.y);
+                    ctx.lineTo(this.trail[i + 1].x, this.trail[i + 1].y);
+                    ctx.stroke();
+                }
+
+                const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size);
+                gradient.addColorStop(0, `hsla(${this.hue}, 100%, 70%, 1)`);
+                gradient.addColorStop(0.5, `hsla(${this.hue + 30}, 90%, 60%, 0.8)`);
+                gradient.addColorStop(1, `hsla(${this.hue + 60}, 80%, 50%, 0.3)`);
+                
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+
+                const angle = Math.atan2(this.vy, this.vx);
+                ctx.strokeStyle = `hsla(${this.hue + 180}, 100%, 80%, 0.6)`;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y);
+                ctx.lineTo(
+                    this.x + Math.cos(angle) * (this.size * 2),
+                    this.y + Math.sin(angle) * (this.size * 2)
+                );
+                ctx.stroke();
+            }
+        }
+
+        const boids = Array.from({ length: boidCount }, () => new Boid());
+        const bigFish = new BigFish();
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            bigFish.setTarget(e.clientX - rect.left, e.clientY - rect.top);
+        });
+
+        toggleBtn.addEventListener('click', () => {
+            isRunning = !isRunning;
+            if (isRunning) {
+                toggleBtn.textContent = '暫停';
+                toggleBtn.className = 'pause';
+                animate();
+            } else {
+                toggleBtn.textContent = '開始';
+                toggleBtn.className = 'start';
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        function animate() {
+            if (!isRunning) return;
+
+            ctx.fillStyle = 'rgba(10, 15, 30, 0.15)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            bigFish.update();
+
+            for (let boid of boids) {
+                boid.update(boids, bigFish);
+                boid.draw(ctx);
+            }
+
+            bigFish.draw(ctx);
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
