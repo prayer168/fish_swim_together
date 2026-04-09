@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>鯉魚旗風力視覺化儀表板</title>
+  <style>
+    :root {
+      --panel: rgba(255,255,255,0.85);
+      --line: rgba(15,23,42,0.08);
+      --text: #0f172a;
+      --muted: #64748b;
+      --shadow: 0 18px 45px rgba(15,23,42,0.12);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+      color: var(--text);
+      background: linear-gradient(180deg, #c8ecff 0%, #eef8ff 52%, #f7fbff 100%);
+      min-height: 100vh;
+    }
+    .wrap {
+      max-width: 1380px;
+      margin: 0 auto;
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 24px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid rgba(255,255,255,0.7);
+      backdrop-filter: blur(12px);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+    }
+    .sidebar { padding: 26px; }
+    .title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      gap: 12px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 32px;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+    }
+    .badge {
+      padding: 8px 14px;
+      background: #e0f2fe;
+      color: #0c4a6e;
+      border-radius: 999px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .desc {
+      margin: 12px 0 24px;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 14px;
+    }
+    .control { margin-bottom: 22px; }
+    .label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    input[type="range"] {
+      width: 100%;
+      accent-color: #2563eb;
+      cursor: pointer;
+    }
+    .metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .metric {
+      background: rgba(248,250,252,0.95);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 14px 16px;
+    }
+    .metric .k {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+    .metric .v {
+      font-size: 24px;
+      font-weight: 800;
+    }
+    .stage {
+      position: relative;
+      min-height: 760px;
+      overflow: hidden;
+      background: linear-gradient(180deg, #bfe9ff 0%, #ecf8ff 60%, #f9fcff 100%);
+    }
+    .ground {
+      position: absolute;
+      inset: auto 0 0 0;
+      height: 170px;
+      background: linear-gradient(180deg, rgba(134,239,172,0) 0%, rgba(187,247,208,0.7) 20%, #b7efbf 100%);
+    }
+    .wind-card {
+      position: absolute;
+      right: 28px;
+      top: 24px;
+      padding: 12px 16px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.82);
+      box-shadow: 0 10px 25px rgba(15,23,42,0.08);
+      font-size: 14px;
+      backdrop-filter: blur(10px);
+      transform-origin: center;
+    }
+    .pole {
+      position: absolute;
+      left: 58px;
+      top: 52px;
+      width: 12px;
+      height: 560px;
+      background: linear-gradient(180deg, #475569 0%, #334155 100%);
+      border-radius: 999px;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.15);
+    }
+    .arm {
+      position: absolute;
+      left: 70px;
+      top: 92px;
+      width: 240px;
+      height: 8px;
+      background: #334155;
+      border-radius: 999px;
+    }
+    .spinner {
+      position: absolute;
+      left: 90px;
+      top: 73px;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #fff 0%, #dbeafe 40%, #93c5fd 100%);
+      box-shadow: 0 4px 10px rgba(37,99,235,0.25);
+    }
+    .flags {
+      position: absolute;
+      left: 106px;
+      top: 70px;
+      transform-origin: left center;
+    }
+    .koino-wrap {
+      position: relative;
+      margin-bottom: 14px;
+      overflow: visible;
+    }
+    .rod-link {
+      position: absolute;
+      left: -22px;
+      top: 50%;
+      width: 32px;
+      height: 8px;
+      transform: translateY(-50%);
+      border-radius: 999px;
+      background: rgba(71,85,105,0.62);
+    }
+    .label-chip {
+      position: absolute;
+      left: 30px;
+      bottom: -6px;
+      font-size: 11px;
+      padding: 2px 8px;
+      background: rgba(255,255,255,0.85);
+      border-radius: 999px;
+      box-shadow: 0 5px 12px rgba(15,23,42,0.08);
+    }
+    svg { overflow: visible; display: block; }
+    .status-grid {
+      position: absolute;
+      right: 26px;
+      bottom: 24px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .status-pill {
+      min-width: 146px;
+      background: rgba(255,255,255,0.82);
+      border-radius: 18px;
+      padding: 12px 14px;
+      box-shadow: 0 12px 25px rgba(15,23,42,0.08);
+      backdrop-filter: blur(10px);
+    }
+    .status-pill .k {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .status-pill .v {
+      margin-top: 4px;
+      font-weight: 800;
+    }
+    .hint {
+      margin-top: 18px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%);
+      border: 1px solid rgba(59,130,246,0.12);
+      color: #334155;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+    @media (max-width: 1100px) {
+      .wrap { grid-template-columns: 1fr; }
+      .stage { min-height: 700px; }
+    }
+    @media (max-width: 720px) {
+      .wrap { padding: 14px; }
+      .sidebar { padding: 20px; }
+      h1 { font-size: 26px; }
+      .metrics { grid-template-columns: 1fr; }
+      .status-grid { grid-template-columns: 1fr; right: 16px; }
+      .pole { left: 22px; }
+      .arm { left: 34px; width: 170px; }
+      .spinner { left: 54px; }
+      .flags { left: 70px; transform: scale(0.88); transform-origin: left top; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="card sidebar">
+      <div class="title-row">
+        <h1>鯉魚旗風力<br>視覺化儀表板</h1>
+        <div class="badge" id="windLevel">微風</div>
+      </div>
+      <div class="desc">透過風速、風向與陣風強度，動態呈現鯉魚旗的仰角、傾斜角、尾部擺動與飄動程度，適合自然、氣象與視覺化教學展示。</div>
+
+      <div class="control">
+        <div class="label-row"><span>風速</span><span id="speedVal">4.2 m/s</span></div>
+        <input id="windSpeed" type="range" min="0" max="12" step="0.1" value="4.2" />
+      </div>
+
+      <div class="control">
+        <div class="label-row"><span>風向偏移</span><span id="dirVal">18°</span></div>
+        <input id="windDirection" type="range" min="-60" max="60" step="1" value="18" />
+      </div>
+
+      <div class="control">
+        <div class="label-row"><span>陣風強度</span><span id="gustVal">1.6</span></div>
+        <input id="gust" type="range" min="0" max="5" step="0.1" value="1.6" />
+      </div>
+
+      <div class="metrics">
+        <div class="metric"><div class="k">鯉魚旗仰角</div><div class="v" id="elevationVal">0°</div></div>
+        <div class="metric"><div class="k">旗身傾角</div><div class="v" id="bodyAngleVal">0°</div></div>
+        <div class="metric"><div class="k">尾部擺幅</div><div class="v" id="tailVal">0°</div></div>
+        <div class="metric"><div class="k">飄動指數</div><div class="v" id="flutterVal">0%</div></div>
+      </div>
+
+      <div class="hint">
+        教學建議：可讓學生先預測「風越大，鯉魚旗會如何改變？」再實際拖拉滑桿，觀察仰角、波動、尾擺與整體張力如何同步變化。
+      </div>
+    </section>
+
+    <section class="card stage">
+      <div class="wind-card" id="windCard">即時風向偏移：18°</div>
+      <div class="pole"></div>
+      <div class="arm"></div>
+      <div class="spinner"></div>
+      <div class="flags" id="flagsGroup">
+        <div class="koino-wrap" id="k1Wrap">
+          <div class="rod-link"></div>
+          <svg id="k1" viewBox="0 0 240 84" width="278" height="97">
+            <defs>
+              <linearGradient id="gBlue" x1="0" x2="1">
+                <stop offset="0%" stop-color="#2563eb" stop-opacity="0.95"></stop>
+                <stop offset="100%" stop-color="#2563eb" stop-opacity="0.72"></stop>
+              </linearGradient>
+            </defs>
+            <path d="M18 42 C30 8, 156 2, 206 18 L238 6 L228 24 L238 42 L228 60 L238 78 L204 66 C154 82, 28 76, 18 42 Z" fill="url(#gBlue)"></path>
+            <ellipse cx="36" cy="42" rx="21" ry="24" fill="rgba(255,255,255,0.18)"></ellipse>
+            <circle cx="42" cy="36" r="14" fill="white"></circle>
+            <circle cx="45" cy="36" r="5.2" fill="#111827"></circle>
+            <circle cx="49" cy="32" r="1.9" fill="white"></circle>
+            <path d="M14 30 L26 42 L14 54" fill="none" stroke="white" stroke-width="3" stroke-opacity="0.7"></path>
+            <g id="k1Scales"></g>
+            <g id="k1Tail"><path d="M206 18 L238 6 L228 24 L238 42 L228 60 L238 78 L204 66" fill="none" stroke="rgba(255,255,255,0.68)" stroke-width="2.5"></path></g>
+          </svg>
+          <div class="label-chip">真鯉</div>
+        </div>
+        <div class="koino-wrap" id="k2Wrap">
+          <div class="rod-link"></div>
+          <svg id="k2" viewBox="0 0 240 84" width="221" height="77">
+            <defs>
+              <linearGradient id="gRed" x1="0" x2="1">
+                <stop offset="0%" stop-color="#ef4444" stop-opacity="0.95"></stop>
+                <stop offset="100%" stop-color="#ef4444" stop-opacity="0.72"></stop>
+              </linearGradient>
+            </defs>
+            <path d="M18 42 C30 8, 156 2, 206 18 L238 6 L228 24 L238 42 L228 60 L238 78 L204 66 C154 82, 28 76, 18 42 Z" fill="url(#gRed)"></path>
+            <ellipse cx="36" cy="42" rx="21" ry="24" fill="rgba(255,255,255,0.18)"></ellipse>
+            <circle cx="42" cy="36" r="14" fill="white"></circle>
+            <circle cx="45" cy="36" r="5.2" fill="#111827"></circle>
+            <circle cx="49" cy="32" r="1.9" fill="white"></circle>
+            <path d="M14 30 L26 42 L14 54" fill="none" stroke="white" stroke-width="3" stroke-opacity="0.7"></path>
+            <g id="k2Scales"></g>
+            <g id="k2Tail"><path d="M206 18 L238 6 L228 24 L238 42 L228 60 L238 78 L204 66" fill="none" stroke="rgba(255,255,255,0.68)" stroke-width="2.5"></path></g>
+          </svg>
+          <div class="label-chip">緋鯉</div>
+        </div>
+        <div class="koino-wrap" id="k3Wrap">
+          <div class="rod-link"></div>
+          <svg id="k3" viewBox="0 0 240 84" width="173" height="60">
+            <defs>
+              <linearGradient id="gGold" x1="0" x2="1">
+                <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.95"></stop>
+                <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.72"></stop>
+              </linearGradient>
+            </defs>
+            <path d="M18 42 C30 8, 156 2, 206 18 L238 6 L228 24 L238 42 L228 60 L238 78 L204 66 C154 82, 28 76, 18 42 Z" fill="url(#gGold)"></path>
+            <ellipse cx="36" cy="42" rx="21" ry="24" fill="rgba(255,255,255,0.18)"></ellipse>
+            <circle cx="42" cy="36" r="14" fill="white"></circle>
+            <circle cx="45" cy="36" r="5.2" fill="#111827"></circle>
+            <circle cx="49" cy="32" r="1.9" fill="white"></circle>
+            <path d="M14 30 L26 42 L14 54" fill="none" stroke="white" stroke-width="3" stroke-opacity="0.7"></path>
+            <g id="k3Scales"></g>
+            <g id="k3Tail"><path d="M206 18 L238 6 L228 24 L238 42 L228 60 L238 78 L204 66" fill="none" stroke="rgba(255,255,255,0.68)" stroke-width="2.5"></path></g>
+          </svg>
+          <div class="label-chip">子鯉</div>
+        </div>
+      </div>
+      <div class="ground"></div>
+      <div class="status-grid">
+        <div class="status-pill"><div class="k">風速狀態</div><div class="v" id="level2">微風</div></div>
+        <div class="status-pill"><div class="k">流線波動</div><div class="v" id="rippleVal">0</div></div>
+        <div class="status-pill"><div class="k">陣風加成</div><div class="v" id="gustVal2">0</div></div>
+        <div class="status-pill"><div class="k">視覺張力</div><div class="v" id="tensionVal">0%</div></div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const el = id => document.getElementById(id);
+    const speedInput = el('windSpeed');
+    const directionInput = el('windDirection');
+    const gustInput = el('gust');
+    const flagsGroup = el('flagsGroup');
+    const windCard = el('windCard');
+
+    const fish = [
+      { wrap: el('k1Wrap'), svg: el('k1'), scales: el('k1Scales'), tail: el('k1Tail'), factor: 1.00 },
+      { wrap: el('k2Wrap'), svg: el('k2'), scales: el('k2Scales'), tail: el('k2Tail'), factor: 1.08 },
+      { wrap: el('k3Wrap'), svg: el('k3'), scales: el('k3Scales'), tail: el('k3Tail'), factor: 1.15 }
+    ];
+
+    function buildScales(group) {
+      group.innerHTML = '';
+      for (let i = 0; i < 7; i++) {
+        const x = 62 + i * 22;
+        const ellipse = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+        ellipse.setAttribute('cx', x);
+        ellipse.setAttribute('cy', 42);
+        ellipse.setAttribute('rx', 14);
+        ellipse.setAttribute('ry', 16);
+        ellipse.setAttribute('fill', 'rgba(255,255,255,0.16)');
+        ellipse.dataset.idx = i;
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', 'rgba(255,255,255,0.28)');
+        path.setAttribute('stroke-width', '2');
+        path.dataset.idx = i;
+
+        group.appendChild(ellipse);
+        group.appendChild(path);
+      }
+    }
+    fish.forEach(f => buildScales(f.scales));
+
+    let time = 0;
+    function getDerived() {
+      const speed = parseFloat(speedInput.value);
+      const direction = parseFloat(directionInput.value);
+      const gust = parseFloat(gustInput.value);
+      const normalized = Math.min(speed / 12, 1);
+      const flutter = Math.min((speed * 0.6 + gust * 1.2) / 10, 1);
+      const tailSwing = 4 + flutter * 16;
+      const bodyAngle = -2 - normalized * 20;
+      const streamerTilt = Math.max(-30, Math.min(direction / 2.4, 30));
+      const flagElevation = 8 + normalized * 22;
+      const ripple = 2 + flutter * 14;
+      let level = '微風';
+      if (speed >= 8) level = '強風';
+      else if (speed >= 5) level = '和風';
+      return { speed, direction, gust, normalized, flutter, tailSwing, bodyAngle, streamerTilt, flagElevation, ripple, level };
+    }
+
+    function syncText(d) {
+      el('speedVal').textContent = d.speed.toFixed(1) + ' m/s';
+      el('dirVal').textContent = d.direction.toFixed(0) + '°';
+      el('gustVal').textContent = d.gust.toFixed(1);
+      el('elevationVal').textContent = d.flagElevation.toFixed(1) + '°';
+      el('bodyAngleVal').textContent = Math.abs(d.bodyAngle).toFixed(1) + '°';
+      el('tailVal').textContent = d.tailSwing.toFixed(1) + '°';
+      el('flutterVal').textContent = Math.round(d.flutter * 100) + '%';
+      el('rippleVal').textContent = d.ripple.toFixed(1);
+      el('gustVal2').textContent = d.gust.toFixed(1);
+      el('tensionVal').textContent = Math.round(40 + d.flutter * 60) + '%';
+      el('windLevel').textContent = d.level;
+      el('level2').textContent = d.level;
+      windCard.textContent = '即時風向偏移：' + d.direction.toFixed(0) + '°';
+      windCard.style.transform = 'rotate(' + (Math.sin(time * 0.02) * d.direction * 0.08) + 'deg)';
+      flagsGroup.style.transform = 'rotate(' + d.streamerTilt + 'deg) translateY(' + (-d.flagElevation) + 'px)';
+    }
+
+    function animate() {
+      const d = getDerived();
+      syncText(d);
+      time += 1;
+
+      fish.forEach((f, idx) => {
+        const kFlutter = Math.min(1, d.flutter * f.factor);
+        const kBody = d.bodyAngle * (1 - idx * 0.05);
+        const kTail = d.tailSwing * (1 + idx * 0.05);
+        const bob = Math.sin(time * (0.03 + idx * 0.005)) * (1.5 + kFlutter * 1.8);
+        const wave = Math.sin(time * (0.08 + idx * 0.01)) * (1.5 + kFlutter * 2.8);
+
+        f.svg.style.transformOrigin = '0% 50%';
+        f.svg.style.transform = 'rotate(' + (kBody + wave) + 'deg) translateY(' + bob + 'px)';
+
+        const ellipses = f.scales.querySelectorAll('ellipse');
+        const paths = f.scales.querySelectorAll('path');
+        ellipses.forEach((ellipse, i) => {
+          const offset = Math.sin(time * 0.1 + i * 0.9 + idx) * (5 + kFlutter * 7);
+          ellipse.setAttribute('cy', (42 + offset * 0.15).toFixed(2));
+        });
+        paths.forEach((path, i) => {
+          const offset = Math.sin(time * 0.1 + i * 0.9 + idx) * (5 + kFlutter * 7);
+          const x = 62 + i * 22;
+          path.setAttribute('d', 'M' + (x - 10) + ' ' + (44 + offset * 0.1).toFixed(2) + ' q10 -14 20 0');
+        });
+
+        const tailRotate = Math.sin(time * (0.12 + idx * 0.02)) * (kTail * 0.45);
+        f.tail.setAttribute('transform', 'rotate(' + tailRotate.toFixed(2) + ' 202 42)');
+      });
+
+      requestAnimationFrame(animate);
+    }
+
+    ['input', 'change'].forEach(evt => {
+      speedInput.addEventListener(evt, () => syncText(getDerived()));
+      directionInput.addEventListener(evt, () => syncText(getDerived()));
+      gustInput.addEventListener(evt, () => syncText(getDerived()));
+    });
+
+    syncText(getDerived());
+    animate();
+  </script>
+</body>
+</html>
